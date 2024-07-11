@@ -6,12 +6,9 @@ import java.net.URI;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -165,7 +162,9 @@ public class PageRank extends Configured implements Tool {
         String[] newArgs = Arrays.copyOf(args, args.length + 1);
         newArgs[newArgs.length - 1] = Integer.toString(k);
 		try {
-			ToolRunner.run(new PageRank(), newArgs);
+            for (int i = 0; i < iterations; i++) {
+                ToolRunner.run(new PageRank(), newArgs);
+            }
 		} catch (final Exception e) {
 			logger.error("", e);
 		}

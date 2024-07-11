@@ -175,30 +175,30 @@ public class PageRank extends Configured implements Tool {
         int k = 100;
         int iterations = 10;
         // create input files
-        try {
-            File file = new File("input/ranks.txt");
-            file.getParentFile().mkdirs();
+        // try {
+        //     File file = new File("input/ranks.txt");
+        //     file.getParentFile().mkdirs();
 
-            PrintWriter printWriter = new PrintWriter(file);
-            for(int i = 1; i < k*k + 1; i++) {
-                printWriter.println(String.format("%d,%f", i, (i == 0) ? 0 : 1.0/(k*k)));
-            }
-            printWriter.close();
+        //     PrintWriter printWriter = new PrintWriter(file);
+        //     for(int i = 1; i < k*k + 1; i++) {
+        //         printWriter.println(String.format("%d,%f", i, (i == 0) ? 0 : 1.0/(k*k)));
+        //     }
+        //     printWriter.close();
 
-            File file2 = new File("input/graph.txt");
-            file2.getParentFile().mkdirs();
+        //     File file2 = new File("input/graph.txt");
+        //     file2.getParentFile().mkdirs();
 
-            printWriter = new PrintWriter(file2);
-            for(int i = 0; i < k; i ++) {
-                for (int j = 0; j < k - 1; j++) {
-                    printWriter.println(String.format("%d,%d,edge", i * k + 1 + j, i * k + 2 + j));
-                }
-                printWriter.println(String.format("%d,%d,edge", (i + 1) * k, 0));
-            }
-            printWriter.close();
-        } catch (final Exception e) {
-            logger.error("", e);
-        }
+        //     printWriter = new PrintWriter(file2);
+        //     for(int i = 0; i < k; i ++) {
+        //         for (int j = 0; j < k - 1; j++) {
+        //             printWriter.println(String.format("%d,%d,edge", i * k + 1 + j, i * k + 2 + j));
+        //         }
+        //         printWriter.println(String.format("%d,%d,edge", (i + 1) * k, 0));
+        //     }
+        //     printWriter.close();
+        // } catch (final Exception e) {
+        //     logger.error("", e);
+        // }
         
         String[] newArgs = Arrays.copyOf(args, args.length + 1);
         newArgs[newArgs.length - 1] = Integer.toString(k);

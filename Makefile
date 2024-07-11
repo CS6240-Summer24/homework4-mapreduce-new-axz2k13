@@ -5,7 +5,7 @@
 hadoop.root=/usr/local/hadoop-3.3.5
 jar.name=mr-demo-1.0.jar
 jar.path=target/${jar.name}
-job.name=wc.WordCount
+job.name=wc.PageRank
 local.input=input
 local.output=output
 # Pseudo-Cluster Execution

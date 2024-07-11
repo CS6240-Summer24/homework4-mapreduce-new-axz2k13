@@ -34,7 +34,7 @@ public class PageRank extends Configured implements Tool {
     }
 
 	public static class TokenizerMapper extends Mapper<Object, Text, IntWritable, FloatWritable> {
-        private final Map<Integer, Float> cache = new HashMap<>(); //Integers are a lot smaller than Strings
+        private final Map<Integer, Integer> cache = new HashMap<>(); //Integers are a lot smaller than Strings
 
         @Override
 		public void setup(Context context) throws IOException, InterruptedException {
@@ -48,11 +48,11 @@ public class PageRank extends Configured implements Tool {
                 String line = reader.readLine();
                 while (line != null) {
                     String[] words = line.split(",");
-                    if (words.length == 2) {
+                    if (words.length == 3) {
                         int left = Integer.parseInt(words[0]);
-                        float right = Float.parseFloat(words[1]);
+                        int right = Integer.parseInt(words[1]);
                         if (MAX <= 0 || (left <= MAX && right <= MAX)) {
-                            //Collections.sort(foo); // should save time when we fetch a bunch
+                            // here we assume every node has at most one outgoing edge
                             cache.put(left, right);
                         }
                     }
@@ -65,18 +65,21 @@ public class PageRank extends Configured implements Tool {
 
         private final IntWritable keyOut = new IntWritable();
         private final FloatWritable valueOut = new FloatWritable();
+        private final FloatWritable danglingValue = new FloatWritable();
 
 		@Override
 		public void map(final Object key, final Text value, final Context context) throws IOException, InterruptedException {
 			final String[] words = value.toString().split(",");
-			if (words.length == 3) {
+			if (words.length == 2) {
                 int left = Integer.parseInt(words[0]);
-                int right = Integer.parseInt(words[1]);
+                int right = cache.get(left);
+                float rank = Float.parseFloat(words[1]);
                 if (right == 0) {
-                    context.getCounter(DANGLING_VALUE.VALUE).increment((long) (cache.get(left)*10000000));
+                    context.getCounter(DANGLING_VALUE.VALUE).increment((long) (rank*10000000));
+                    danglingValue.set(danglingValue.get() + rank);
                 } else {
                     keyOut.set(right);
-                    valueOut.set(cache.get(left));
+                    valueOut.set(rank);
                     // here we assume every node only has one outgoing edge
                     context.write(keyOut, valueOut);
                     keyOut.set(left);
@@ -96,21 +99,42 @@ public class PageRank extends Configured implements Tool {
 			for (final FloatWritable val : values) {
 				sum += val.get();
 			}
-            int k = Integer.parseInt(context.getConfiguration().get("k"));
-			result.set(sum + ((float)context.getCounter(DANGLING_VALUE.VALUE).getValue()/10000000)/(k*k));
+            //int k = Integer.parseInt(context.getConfiguration().get("k"));
+            //float danglingValue = Float.parseFloat(context.getConfiguration().get("danglingValue"));
+			result.set(sum);
 			context.write(key, result);
+		}
+	}
+
+    public static class DanglingMapper extends Mapper<Object, Text, IntWritable, FloatWritable> {
+        private final IntWritable keyOut = new IntWritable();
+        private final FloatWritable valueOut = new FloatWritable();
+
+		@Override
+		public void map(final Object key, final Text value, final Context context) throws IOException, InterruptedException {
+			final String[] words = value.toString().split(",");
+			if (words.length == 2) {
+                int left = Integer.parseInt(words[0]);
+                float rank = Float.parseFloat(words[1]);
+                if (left != 0) {
+                    float danglingValue = Float.parseFloat(context.getConfiguration().get("danglingValue"));
+                    keyOut.set(left);
+                    valueOut.set(rank + danglingValue);
+                    context.write(keyOut, valueOut);
+                }
+            }
 		}
 	}
 
 	@Override
 	public int run(final String[] args) throws Exception {
 		final Configuration conf = getConf();
-		final Job job = Job.getInstance(conf, "Word Count");
+		final Job job = Job.getInstance(conf, "PageRank");
 		job.setJarByClass(PageRank.class);
 		final Configuration jobConf = job.getConfiguration();
-		jobConf.set("mapreduce.output.textoutputformat.separator", "\t");
+		jobConf.set("mapreduce.output.textoutputformat.separator", ",");
         jobConf.set("k", args[2]);
-        job.addCacheFile(new Path(args[0]+"/ranks.txt").toUri());
+        job.addCacheFile(new Path("input/graph.txt").toUri());
 		// Delete output directory, only to ease local development; will not work on AWS. ===========
 //		final FileSystem fileSystem = FileSystem.get(conf);
 //		if (fileSystem.exists(new Path(args[1]))) {
@@ -123,8 +147,25 @@ public class PageRank extends Configured implements Tool {
 		job.setOutputKeyClass(IntWritable.class);
 		job.setOutputValueClass(FloatWritable.class);
 		FileInputFormat.addInputPath(job, new Path(args[0]));
-		FileOutputFormat.setOutputPath(job, new Path(args[1]));
-		return job.waitForCompletion(true) ? 0 : 1;
+		FileOutputFormat.setOutputPath(job, new Path(args[1]+"/temp"));
+		job.waitForCompletion(true);
+
+        final Configuration conf2 = getConf();
+		final Job job2 = Job.getInstance(conf2, "Resolve Dangling Page Rank");
+        job2.setJarByClass(PageRank.class);
+		final Configuration jobConf2 = job2.getConfiguration();
+		jobConf2.set("mapreduce.output.textoutputformat.separator", ",");
+
+        float dValue = (float)job.getCounters().findCounter(DANGLING_VALUE.VALUE).getValue()/10000000;
+        int k = Integer.parseInt(args[2]);
+        jobConf2.set("danglingValue", "" + (dValue/(k*k)));
+
+        FileInputFormat.addInputPath(job2, new Path(args[1]+"/temp"));
+		FileOutputFormat.setOutputPath(job2, new Path(args[1]+"/final"));
+        job2.setMapperClass(DanglingMapper.class);
+        job2.setOutputKeyClass(IntWritable.class);
+		job2.setOutputValueClass(FloatWritable.class);
+        return job2.waitForCompletion(true) ? 0 : 1;
 	}
 
 	public static void main(final String[] args) {
@@ -139,8 +180,8 @@ public class PageRank extends Configured implements Tool {
             file.getParentFile().mkdirs();
 
             PrintWriter printWriter = new PrintWriter(file);
-            for(int i = 0; i < k + 1; i++) {
-                printWriter.println(String.format("%d, %f", i, (i == 0) ? 0 : 1.0/(k*k)));
+            for(int i = 1; i < k*k + 1; i++) {
+                printWriter.println(String.format("%d,%f", i, (i == 0) ? 0 : 1.0/(k*k)));
             }
             printWriter.close();
 
@@ -150,9 +191,9 @@ public class PageRank extends Configured implements Tool {
             printWriter = new PrintWriter(file2);
             for(int i = 0; i < k; i ++) {
                 for (int j = 0; j < k - 1; j++) {
-                    printWriter.println(String.format("%d, %d, edge", i * k + 1 + j, i * k + 2 + j));
+                    printWriter.println(String.format("%d,%d,edge", i * k + 1 + j, i * k + 2 + j));
                 }
-                printWriter.println(String.format("%d, %d, edge", (i + 1) * k, 0));
+                printWriter.println(String.format("%d,%d,edge", (i + 1) * k, 0));
             }
             printWriter.close();
         } catch (final Exception e) {
@@ -162,7 +203,11 @@ public class PageRank extends Configured implements Tool {
         String[] newArgs = Arrays.copyOf(args, args.length + 1);
         newArgs[newArgs.length - 1] = Integer.toString(k);
 		try {
-            for (int i = 0; i < iterations; i++) {
+            newArgs[1] = args[1]+"/iter1";
+            ToolRunner.run(new PageRank(), newArgs);
+            for (int i = 1; i < iterations; i++) {
+                newArgs[0] = args[1]+String.format("/iter%d/final", i);
+                newArgs[1] = args[1]+String.format("/iter%d", i + 1);
                 ToolRunner.run(new PageRank(), newArgs);
             }
 		} catch (final Exception e) {

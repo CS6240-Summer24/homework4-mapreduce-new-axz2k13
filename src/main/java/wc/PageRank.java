@@ -16,6 +16,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -41,10 +42,13 @@ public class PageRank extends Configured implements Tool {
             URI[] cacheFiles = context.getCacheFiles();
             long MAX = -1;//context.getConfiguration().getLong("limit", Integer.MAX_VALUE);
             for (URI cacheFile : cacheFiles) {
-                //FileSystem fs = FileSystem.get(new Path("s3a://cs6240-hw2-bucket").toUri(), context.getConfiguration());
-                FileSystem fs = FileSystem.get(context.getConfiguration()); 
-                Path getFilePath = new Path(cacheFile.toString()); 
-                BufferedReader reader = new BufferedReader(new InputStreamReader(fs.open(getFilePath))); 
+                FileSystem fs = FileSystem.get(new Path("s3://cs6240-hw4-mr-bucket/").toUri(), context.getConfiguration());
+                //FileSystem fs = FileSystem.get(context.getConfiguration()); 
+                // Path getFilePath = new Path(cacheFile.toString()); 
+                // BufferedReader reader = new BufferedReader(new InputStreamReader(fs.open("s3a://cs6240-hw4-mr-bucket/input/graph.txt"))); 
+                fs.setWorkingDirectory(new Path("/input/"));
+                FSDataInputStream in = fs.open(new Path("graph.txt"));
+                BufferedReader reader = new BufferedReader(new InputStreamReader(in));
                 String line = reader.readLine();
                 while (line != null) {
                     String[] words = line.split(",");
@@ -134,7 +138,7 @@ public class PageRank extends Configured implements Tool {
 		final Configuration jobConf = job.getConfiguration();
 		jobConf.set("mapreduce.output.textoutputformat.separator", ",");
         jobConf.set("k", args[2]);
-        job.addCacheFile(new Path("input/graph.txt").toUri());
+        job.addCacheFile(new Path(args[0]+"/graph.txt").toUri());
 		// Delete output directory, only to ease local development; will not work on AWS. ===========
 //		final FileSystem fileSystem = FileSystem.get(conf);
 //		if (fileSystem.exists(new Path(args[1]))) {
@@ -172,7 +176,7 @@ public class PageRank extends Configured implements Tool {
 		if (args.length != 2) {
 			throw new Error("Two arguments required:\n<input-dir> <output-dir>");
 		}
-        int k = 100;
+        int k = 10000;
         int iterations = 10;
         // create input files
         // try {

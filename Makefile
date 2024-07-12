@@ -15,13 +15,14 @@ hdfs.output=output
 # AWS EMR Execution
 aws.emr.release=emr-6.10.0
 aws.region=us-east-1
-aws.bucket.name=cs6240-demo-bucket
+aws.bucket.name=cs6240-hw4-mr-bucket
 aws.subnet.id=subnet-6356553a
 aws.input=input
 aws.output=output
 aws.log.dir=log
-aws.num.nodes=1
-aws.instance.type=m3.xlarge
+aws.num.nodes=5
+aws.instance.type=r8g.2xlarge
+aws.region = us-east-1
 # -----------------------------------------------------------
 
 # Compiles code and builds jar (with dependencies).
@@ -119,7 +120,8 @@ aws: jar upload-app-aws delete-output-aws
 		--configurations '[{"Classification": "hadoop-env", "Configurations": [{"Classification": "export","Configurations": [],"Properties": {"JAVA_HOME": "/usr/lib/jvm/java-11-amazon-corretto.x86_64"}}],"Properties": {}}]' \
 		--use-default-roles \
 		--enable-debugging \
-		--auto-terminate
+		--auto-terminate \
+		--region ${aws.region}
 
 # Download output from S3.
 download-output-aws: clean-local-output

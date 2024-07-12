@@ -21,7 +21,7 @@ aws.input=input
 aws.output=output
 aws.log.dir=log
 aws.num.nodes=5
-aws.instance.type=r8g.2xlarge
+aws.instance.type=r5.2xlarge
 aws.region = us-east-1
 # -----------------------------------------------------------
 
